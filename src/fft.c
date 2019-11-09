@@ -5,6 +5,24 @@ typedef struct scomplex{
 	float real;
 	float imag;
 }scomplex;
+unsigned int Log2n(unsigned int n ){
+    return (n>1) ? 1 + Log2n(n/2) : 0;
+}
+unsigned int reversedNumber(unsigned int numberToBeReversed, unsigned int bitSpan){
+    unsigned int num = 0;
+     {
+    for (int i = 0; i < bitSpan; i++)
+        if (numberToBeReversed & (1 << (bitSpan-i-1)))
+        {
+            num |= (1 << i);
+        }else
+        {
+            num &= ~(1 << i );
+        }
+    }
+    return num;
+}
+unsigned int reversedArray[256] ;
 
 scomplex multiply(scomplex x, scomplex y){
 	scomplex mult;
@@ -37,7 +55,7 @@ void fft(scomplex * samples, scomplex * freqbins, int N){
 	//determines the offset between odd and even 
 	int line = 1;
 	//number of stages 
-	int numStages = log2f(N);
+	int numStages = Log2n(N);
 	//        N
 	// X[k] = Σ x_k W_n
 	//       n=0 
