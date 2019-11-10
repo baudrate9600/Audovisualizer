@@ -14,4 +14,4 @@ scomplex add(scomplex x, scomplex y);
 scomplex subtract(scomplex x, scomplex y);
 float magnitude(scomplex x);
 int imagnitude(scomplex x);
-void fft(scomplex * samples, scomplex * freqbins, int N,int log2N);
+void fft(scomplex * samples, int N,int log2N);

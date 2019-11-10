@@ -96,6 +96,7 @@ void setAddressWindow(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1)
 }
 void Write565(int data, unsigned int count)
 {
+    writeCommand(RAMWR);
     for (; count > 0; count--)
     {
         SPDR = (data >> 8);
@@ -118,6 +119,20 @@ void clearScreen(int color)
     writeCommand(RAMWR);
     Write565(color, 20480);
 }
+void HLine (uint8_t x0, uint8_t x1, uint8_t y, int color)
+// draws a horizontal line in given color
+{
+ uint8_t width = x1-x0+1;
+ setAddressWindow(x0,y,x1,y);
+ Write565(color,width);
+}
+void VLine (uint8_t x, uint8_t y0, uint8_t y1, int color)
+// draws a vertical line in given color
+{
+ uint8_t height = y1-y0+1;
+ setAddressWindow(x,y0,x,y1);
+ Write565(color,height);
+}
 void initAD(){
 	ADMUX |= (1 << REFS0) ;
 	ADCSRA |= (1 << ADPS0) | (1 << ADPS1) | (1 << ADPS2); /* ADC clock prescaler /128 */
@@ -134,12 +149,12 @@ int readAnalog(int pin){
 	return adc;
 	
 }
-#define N 32
+#define N 64
 int main()
 {
     DDRB |= SDA | SCK | RESET | DC; //Set As Output
     DDRC &= ~(1 << PC0); 
-    int bitspan = 5;
+    int bitspan = 6;
     unsigned int reversedArray[256];
 
     for (int i = 0; i < N; i++)
@@ -147,7 +162,7 @@ int main()
         reversedArray[i] = reversedNumber(i, bitspan);
     }
     scomplex samples[N];
-    scomplex freqbin[N];
+    
 
     PORTB &= ~RESET;
     spi();
@@ -156,23 +171,22 @@ int main()
     writeCommand(MADCTL);
     writeByte(0x60);
     clearScreen(BLACK);
-    int offset = XSIZE / 2.0;
-    float w = TWO_PI / 160.0;
-    int counter = 0;
+    int width = YMAX - N;
+    int offset = width/2.0f;
 
     for(int i =  0; i < N; i++){
         samples[i].imag = 0; 
         samples[reversedArray[i]].real = readAnalog(PC0);
-        _delay_ms(10);
+        _delay_us(25);
     }
-    fft(samples,freqbin,N,5);
-    DrawPixel(0,0,YELLOW);
+    fft(samples,N,5);
+  
     for(int i = 1; i < N;i++){
-        DrawPixel(i, 10 + imagnitude( freqbin[i] ) ,YELLOW);
+        VLine(offset+i,0, 0.001 * magnitude(samples[i]),YELLOW);
     }
     while (1)
     {
     }
-    counter++;
+    
 }
 

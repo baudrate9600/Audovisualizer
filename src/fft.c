@@ -47,7 +47,7 @@ int imagnitude(scomplex x){
 }
 
 
-void fft(scomplex * samples, scomplex * freqbins, int N,int logN){
+void fft(scomplex * samples, int N,int logN){
 	int counter = 0;
 	int numButterflies = N/2;
 	//determines the offset between odd and even 
