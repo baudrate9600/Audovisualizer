@@ -1,10 +1,8 @@
 #include <math.h>
+#include "../include/fft.h"
 #define PI 3.14159265359
 #define TWO_PI 6.28318530718
-typedef struct scomplex{
-	float real;
-	float imag;
-}scomplex;
+
 unsigned int Log2n(unsigned int n ){
     return (n>1) ? 1 + Log2n(n/2) : 0;
 }
@@ -22,7 +20,6 @@ unsigned int reversedNumber(unsigned int numberToBeReversed, unsigned int bitSpa
     }
     return num;
 }
-unsigned int reversedArray[256] ;
 
 scomplex multiply(scomplex x, scomplex y){
 	scomplex mult;
@@ -45,17 +42,18 @@ scomplex subtract(scomplex x, scomplex y){
 float magnitude(scomplex x){
 	return sqrt( x.real*x.real + x.imag*x.imag);
 }
-
-void bitreversal(scomplex * reversed){
-    
+int imagnitude(scomplex x){
+	return (int) sqrt(x.real*x.real + x.imag*x.imag);
 }
-void fft(scomplex * samples, scomplex * freqbins, int N){
+
+
+void fft(scomplex * samples, scomplex * freqbins, int N,int logN){
 	int counter = 0;
 	int numButterflies = N/2;
 	//determines the offset between odd and even 
 	int line = 1;
 	//number of stages 
-	int numStages = Log2n(N);
+	int numStages = logN;
 	//        N
 	// X[k] = Σ x_k W_n
 	//       n=0 
