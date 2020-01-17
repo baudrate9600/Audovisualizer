@@ -44,11 +44,10 @@ void send(uint8_t led, uint16_t drain){
     PORTD |= (1 << DRCLK);
 }
 volatile float fftOut[16];
-volatile int frame[16];
 volatile int display[16];
 volatile float avg[16];
 volatile int counter;
-volatile int counter2; 
+volatile int sample_count = 0; 
 int moveto(int old, int new){
     if(old == new) return new;
     else{
@@ -60,10 +59,10 @@ int moveto(int old, int new){
     } 
 }
 ISR(TIMER1_COMPA_vect){
-     
+    
     for(int i = 0; i < 16; i++){
             
-            send((1<<frame[i]-1)-1,(1<<(15-i)));
+            send((1<<display[i]-1)-1,(1<<(15-i)));
         }
     for(int i = 0; i < 16; i++){
             send(0,0);
@@ -72,28 +71,24 @@ ISR(TIMER1_COMPA_vect){
 }
 ISR(TIMER0_COMPA_vect){
     counter++;
-    counter2++;
-    if(counter2 == 100){
-        for(int i = 0; i < 16; i++){
-        if(display[i] < frame[i]){
-            frame[i]--;
-        }else{
-            frame[i] = display[i];
-        }    
-    }
-    counter2 = 0;
-    }
     
-    if(counter ==200){
+    if(counter ==100){
         for(int i = 0; i < 16; i++){
-            int f =  log(round(fftOut[i]));
-            display[i]=f;
+            int f = round(fftOut[i] *  0.0078125);
+           if(f > display[i]){
+               display[i]=f;
+           }else{
+               display[i]--;
+           }
+           
         }   
         counter = 0;
     }
-    
-    
 } 
+ISR(TIMER2_COMPA_vect){
+    
+}
+
 
 
 int main(){
@@ -109,7 +104,7 @@ int main(){
         reversedArray[i] = reversedNumber(i, 5);
     }   
     for (int i = 0; i < 32; i++){
-      hanning[i]= 0.5 - 0.5  * cos(6.28318530718*i / 32.0);
+      hanning[i]= 0.54 - 0.5  * cos(6.28318530718*i / 32.0);
     }
     DDRB |= (1 << PB3) | (1 << PB5);
     ADCSRA |= ( 1 << ADPS2 ) | (1<<ADPS0);
@@ -132,15 +127,25 @@ int main(){
     TIMSK0 |= (1 << OCIE0A); 
     OCR0A = 30; 
 
+      // Clear registers
+  TCCR2A = 0;
+  TCCR2B = 0;
+  TCNT2 = 0;
+
+    // 40000 Hz (16000000/((49+1)*8))
+    OCR2A = 49;
+    // CTC
+    TCCR2A |= (1 << WGM21);
+    // Prescaler 8
+    TCCR2B |= (1 << CS21);
+    // Output Compare Match A Interrupt Enable
+    TIMSK2 |= (1 << OCIE2A);
 
      sei();
     float mean =0; 
-    
     //LOOP
-    float test[32]; 
-    for(int i = 0; i < 32; i++){
-        test[i] = 300 * sin(6.28318530718 * 100 * 0.000025 * i );
-    }
+    
+    
     while(1){
         mean =0;
         for(int i = 0; i < 32; i++){
@@ -152,20 +157,15 @@ int main(){
             adc = ADCL;
             adc  = (ADCH<<8) | (adc & 0xff);   
             //Subtract 512 (dc offset) from adc 
-            samples[reversedArray[i]].real = (adc-512)*hanning[reversedArray[i]] ;    
+            //samples[reversedArray[i]].real = (adc-512)*hanning[reversedArray[i]] ;    
+
             //time domain so complex is zero  
             samples[i].imag = 0; 
             sei();
-             mean+=samples[reversedArray[i]].real;
+             
             
         }  
-    //mean/32.0;
-    //Remove DC offset from signal by taking the mean and subtracting it from the samples
-    //for(int i =1; i < 32;i++){
-     //   samples[reversedArray[i]].real = (samples[reversedArray[i]].real -mean)*hanning[i];
-    //}
-  //  samples[0].real =0;
-    //Apply the fourier transform on the samples
+    
     fft(samples,32,5);
     for(uint16_t i = 0; i < 16; i++){
         fftOut[i] = (magnitude(samples[i]))  ;

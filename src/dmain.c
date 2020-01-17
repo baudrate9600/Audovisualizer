@@ -23,7 +23,7 @@
 #define DRCLK  6
 #define DSRCLK 13
 
-
+#define NUM_SAMPLES
 
 void spi(void)
 {
@@ -43,12 +43,13 @@ void send(uint8_t led, uint16_t drain){
     while (!(SPSR & (1 << SPIF))); 
     PORTD |= (1 << DRCLK);
 }
-volatile float fftOut[16];
+volatile float fftOut[32];
 volatile int frame[16];
 volatile int display[16];
 volatile float avg[16];
 volatile int counter;
 volatile int counter2; 
+volatile int logindex[32];
 int moveto(int old, int new){
     if(old == new) return new;
     else{
@@ -86,7 +87,7 @@ ISR(TIMER0_COMPA_vect){
     
     if(counter ==200){
         for(int i = 0; i < 16; i++){
-            int f =  log(round(fftOut[i]));
+            int f =  (round(fftOut[logindex[i]])  * 0.0125);
             display[i]=f;
         }   
         counter = 0;
@@ -102,14 +103,17 @@ int main(){
      counter = 0;
     
     //int height[16];
-    float hanning[32]; 
-    scomplex samples[32];
-    unsigned int reversedArray[32];
-    for (int i = 0; i < 32; i++){
-        reversedArray[i] = reversedNumber(i, 5);
+    float hanning[64]; 
+    scomplex samples[64];
+    unsigned int reversedArray[64];
+    for (int i = 0; i < 64; i++){
+        reversedArray[i] = reversedNumber(i, 6);
     }   
-    for (int i = 0; i < 32; i++){
-      hanning[i]= 0.5 - 0.5  * cos(6.28318530718*i / 32.0);
+    for (int i = 0; i < 64; i++){
+      hanning[i]= 0.5 - 0.5  * cos(6.28318530718*i / 64.0);
+    }
+    for(int i = 0; i < 16; i++){
+        logindex[i] = round(31*log10(1+9*i/15.0));
     }
     DDRB |= (1 << PB3) | (1 << PB5);
     ADCSRA |= ( 1 << ADPS2 ) | (1<<ADPS0);
@@ -143,7 +147,7 @@ int main(){
     }
     while(1){
         mean =0;
-        for(int i = 0; i < 32; i++){
+        for(int i = 0; i < 64; i++){
             cli();
                       //Reads the analog value from pin PC0
             ADCSRA |= (1 << ADSC ); // start ADC conversion ./
@@ -156,7 +160,7 @@ int main(){
             //time domain so complex is zero  
             samples[i].imag = 0; 
             sei();
-             mean+=samples[reversedArray[i]].real;
+           
             
         }  
     //mean/32.0;
@@ -166,9 +170,9 @@ int main(){
     //}
   //  samples[0].real =0;
     //Apply the fourier transform on the samples
-    fft(samples,32,5);
-    for(uint16_t i = 0; i < 16; i++){
-        fftOut[i] = (magnitude(samples[i]))  ;
+    fft(samples,64,6);
+    for(int i = 0; i < 32 ; i++){
+        fftOut[i] = magnitude(samples[i])  ;
     }
     
 }
