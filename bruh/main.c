@@ -91,7 +91,7 @@ void timer2_start(){
 }
 volatile uint16_t render_timer; 
 volatile uint32_t general_timer; 
-volatile scomplex sample_vec[32];
+volatile scomplex sample_vec[N_SAMPLES];
 volatile int sample_counter;
 volatile uint16_t adc;
 volatile uint8_t sample_done; 
@@ -105,7 +105,7 @@ ISR(TIMER2_COMPA_vect){
 		if(sample_counter == -1){
 			ADCSRA |= (1<<ADSC);
 			sample_counter++;
-		}else if(sample_counter == 31){
+		}else if(sample_counter == (N_SAMPLES-1)){
 			sample_vec[reversed[sample_counter]].real = ADCH-VOLTAGE_OFFSET;
 			sample_done = 1;
 			timer2_stop(); 
@@ -161,7 +161,7 @@ void init_adc(){
 }
 void columns( uint8_t * column_vector){
 	for(int i = 0; i < 16; i++){
-		frame[i] = (1 << column_vector[i]) -1; 
+		frame[i] = (1 << column_vector[15-i]) -1; 
 	}
 }
 int clamp(float val){
@@ -194,9 +194,10 @@ int main(){
 		/* Render Cycle */
 	demo();	
 	uint8_t column_vec[16] ;
+	uint8_t old_column[16] ;
 	columns(column_vec);
 	init_adc();
-//	initSerial();
+	initSerial();
 	sei();
 	char buffer[20];
 	_delay_ms(1);
@@ -204,21 +205,30 @@ int main(){
 	timer2();
 	float smoothing; 
 	float delta; 
+	float c_smooth = 0.55; 
     while(1){
 			if(sample_done == 1){
-			for(int i = 0; i < 32; i++){
+			for(int i = 0; i < N_SAMPLES; i++){
 				int k = reversed[i];
 				sample_vec[i].real = hanning[k] * sample_vec[i].real;
 				sample_vec[i].imag = 0; 
 			}
 		
+			uint32_t timert = general_timer;
 		    fft(sample_vec);
-			for(uint16_t i = 1; i < 16; i++){
-				smoothing =  2*log(magnitude(sample_vec[i]));
-				column_vec[i]  = clamp(smoothing);
+			timert = general_timer - timert;
+			sprintf(buffer,"\nFFT TOOK %d us\n",timert*100);
+			writeString(buffer);
+			
+			for(uint16_t i = 0; i < N_SAMPLES/2; i++){
+				writeInt(magnitude(sample_vec[i])*100);
+				writeString(" ");
+				smoothing =c_smooth*old_column[i] + (1-c_smooth)* magnitude(sample_vec[i]);
+			//	old_column[i]  = column_vec[i];
+			//	column_vec[i] = smoothing;
 			}
-			columns(column_vec);
-			sample_done = 0; 
+		//	columns(column_vec);
+			sample_done = 2; 
 			timer2_start();	
 		}
 	//	decay_columns(200);
