@@ -1,7 +1,7 @@
 //Fast fourier transform for avr 
 #define PI 3.14159265359
 #define TWO_PI 6.28318530718
-#define N_SAMPLES 64
+#define N_SAMPLES 32
 #include <avr/io.h>
 typedef struct scomplex{
 	float real;
@@ -21,5 +21,5 @@ void fft(scomplex * samples );
 //float sin_lut[5][16];
 extern uint8_t reversed[N_SAMPLES];
 extern float hanning[N_SAMPLES];
-float lut_cos[63];
-float lut_sin[63]; 
+float lut_cos[31];
+float lut_sin[31]; 

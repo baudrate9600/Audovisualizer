@@ -205,7 +205,8 @@ int main(){
 	timer2();
 	float smoothing; 
 	float delta; 
-	float c_smooth = 0.55; 
+	float c_smooth = 0.8; 
+	float max = 2;
     while(1){
 			if(sample_done == 1){
 			for(int i = 0; i < N_SAMPLES; i++){
@@ -214,25 +215,22 @@ int main(){
 				sample_vec[i].imag = 0; 
 			}
 		
-			uint32_t timert = general_timer;
 		    fft(sample_vec);
-			timert = general_timer - timert;
-			sprintf(buffer,"\nFFT TOOK %d us\n",timert*100);
-			writeString(buffer);
-			
-			for(uint16_t i = 0; i < N_SAMPLES/2; i++){
-				writeInt(magnitude(sample_vec[i])*100);
-				writeString(" ");
-				smoothing =c_smooth*old_column[i] + (1-c_smooth)* magnitude(sample_vec[i]);
-			//	old_column[i]  = column_vec[i];
-			//	column_vec[i] = smoothing;
+
+				
+			for(uint16_t i = 1; i < N_SAMPLES/2; i++){
+					float val = magnitude(sample_vec[i]);
+					if(val < max ){
+						val = 0; 
+					}
+					smoothing =c_smooth*old_column[i] + (1-c_smooth)* val;
+					old_column[i]  = column_vec[i];
+					column_vec[i] = smoothing;
 			}
-		//	columns(column_vec);
-			sample_done = 2; 
+			column_vec[1] = column_vec[1]/2;
+			columns(column_vec);
+			sample_done = 0; 
 			timer2_start();	
 		}
-	//	decay_columns(200);
-		
-	//	clear_frame(); 
 	}
 }
