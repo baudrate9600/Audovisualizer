@@ -22,7 +22,7 @@
 #define DRCLK  6
 #define DSRCLK 13
 #define VOLTAGE_OFFSET 128 
-
+#define NPN_0 ( 1 << PB0)
 
 
 void spi(void)
@@ -75,7 +75,7 @@ void timer2(){
   TCNT2 = 0;
 
   // 20000 Hz (16000000/((24+1)*32))
-  OCR2A = 24;
+  OCR2A = 48;
   // CTC
   TCCR2A |= (1 << WGM21);
   // Prescaler 32
@@ -188,14 +188,17 @@ int main(){
     DDRB |= (1 << PB3) | (1 << PB5);
     DDRB |= ( 1 << PB2 );
     PORTB &= ~(1 << PB2);
+	DDRB |= NPN_0;
     DDRD |=  (1 << DRCLK ) ;
+	PORTB |= NPN_0;
     spi();
 	
 		/* Render Cycle */
 	demo();	
-	uint8_t column_vec[16] ;
-	uint8_t old_column[16] ;
-	columns(column_vec);
+	uint8_t column_vec[32] ;
+	uint8_t old_column[32] ;
+	uint8_t display_column[16];
+	//columns(column_vec);
 	init_adc();
 	initSerial();
 	sei();
@@ -207,19 +210,20 @@ int main(){
 	float delta; 
 	float c_smooth = 0.8; 
 	float max = 2;
+	while(1);
     while(1){
 			if(sample_done == 1){
 			for(int i = 0; i < N_SAMPLES; i++){
 				int k = reversed[i];
-				sample_vec[i].real = hanning[k] * sample_vec[i].real;
+				sample_vec[i].real = hanning_lut[k] * sample_vec[i].real;
 				sample_vec[i].imag = 0; 
 			}
 		
 		    fft(sample_vec);
 
 				
-			for(uint16_t i = 1; i < N_SAMPLES/2; i++){
-					float val = magnitude(sample_vec[i]);
+			for(uint16_t i = 1; i < 32; i++){
+					float val = magnitude(sample_vec[i])/2;
 					if(val < max ){
 						val = 0; 
 					}
@@ -227,8 +231,19 @@ int main(){
 					old_column[i]  = column_vec[i];
 					column_vec[i] = smoothing;
 			}
-			column_vec[1] = column_vec[1]/2;
-			columns(column_vec);
+		//	column_vec[1] = column_vec[1]/2;
+		//	display_column[0] = (column_vec[1]+column_vec[2]+column_vec[3]+column_vec[4]+column_vec[5]+column_vec[6]+column_vec[7]+column_vec[8])/8.0;
+		//	display_column[1] = (column_vec[9]+column_vec[10]+column_vec[11]+column_vec[12]+column_vec[13]+column_vec[14])/6.0;
+		//	display_column[2] = (column_vec[15]+column_vec[16]+column_vec[17]+column_vec[18])/4.0;
+		//	display_column[3] = (column_vec[19] + column_vec[20])/2.0;
+		//	for(int i = 0; i < 12;i++){
+		//		display_column[i+4] = column_vec[21+i];
+		//	}
+			display_column[0] = column_vec[1]/2;
+			for(int i = 0; i < 15; i=i+2){
+				
+			}
+			columns(display_column);
 			sample_done = 0; 
 			timer2_start();	
 		}
