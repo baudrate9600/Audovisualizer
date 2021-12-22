@@ -22,7 +22,8 @@
 #define DRCLK  6
 #define DSRCLK 13
 #define VOLTAGE_OFFSET 128 
-#define NPN_0 ( 1 << PB0)
+#define NPN_0 ( 1 << PD2)
+#define NPN_1 ( 1 << PD3)
 
 
 void spi(void)
@@ -44,9 +45,9 @@ void send(uint8_t led, uint16_t drain){
     PORTD |= (1 << DRCLK);
 }
 
-uint8_t frame[16];
+uint8_t frame[18];
 void put_pixel(uint8_t x, uint8_t y){
-	frame[y] = 1 <<x ;	
+	frame[y] = 1U <<x ;	
 }
 void clear_frame(){
 	for(int i = 0; i < 16; i++){
@@ -121,18 +122,30 @@ ISR(TIMER2_COMPA_vect){
 void render(uint16_t pwm){
 	static uint8_t counter = 0; 
 	if(render_timer >= pwm){
+			PORTD &= ~NPN_0;
+			PORTD &= ~NPN_1;
 			render_timer = 0; 
-			if(counter == 16){
+			if(counter == 0){
+				PORTD |= NPN_1;
+				send(frame[counter],0);
+				counter++;
+			}else if(counter == 18){
 				send(0,0xFF);
 				counter = 0;
+			}else if(counter == 17){
+				PORTD |= NPN_0;
+				send(frame[counter],0);
+				counter++;
 			}else{
-				send(frame[counter],1 << counter );
+				send(frame[counter],1U << (counter-1) );
 				counter++;
 			}
 		}
 	}
 
 void demo(){
+	frame[17] = 0x01;
+	frame[16]= 0xF3;
 	frame[15] = 0xFF; 
 	frame[14] = 0b10010000;
 	frame[13] = 0b10010000;
@@ -146,8 +159,8 @@ void demo(){
 	frame[4] = 0b10000000;
 	frame[3] = 0b11111111;
 	frame[2] = 0b10000000;
-	frame[1] = 0b10000000;
-	
+	frame[1] = 0b00000000;
+	frame[0] = 0b10000000;
 
 }
 
@@ -160,8 +173,8 @@ void init_adc(){
     while(ADCSRA & (1 <<ADSC));
 }
 void columns( uint8_t * column_vector){
-	for(int i = 0; i < 16; i++){
-		frame[i] = (1 << column_vector[15-i]) -1; 
+	for(int i = 0; i < 18; i++){
+		frame[i] = (1 << column_vector[17-i]) -1; 
 	}
 }
 int clamp(float val){
@@ -175,11 +188,12 @@ int clamp(float val){
 }
 void decay_columns(uint16_t decay_speed){
 	if((general_timer % decay_speed) == 0){
-		for(int i = 0; i < 16; i++){
+		for(int i = 0; i < 18; i++){
 			frame[i] = frame[i] >> 1; 
 		}
 	}
 }
+
 int main(){
 	/*Variable initialization */
 	sample_counter = -1; 	
@@ -188,16 +202,15 @@ int main(){
     DDRB |= (1 << PB3) | (1 << PB5);
     DDRB |= ( 1 << PB2 );
     PORTB &= ~(1 << PB2);
-	DDRB |= NPN_0;
     DDRD |=  (1 << DRCLK ) ;
-	PORTB |= NPN_0;
+	DDRD |= NPN_0 | NPN_1;
     spi();
 	
 		/* Render Cycle */
-	demo();	
+//	demo();
 	uint8_t column_vec[32] ;
 	uint8_t old_column[32] ;
-	uint8_t display_column[16];
+	uint8_t display_column[18];
 	//columns(column_vec);
 	init_adc();
 	initSerial();
@@ -209,8 +222,7 @@ int main(){
 	float smoothing; 
 	float delta; 
 	float c_smooth = 0.8; 
-	float max = 2;
-	while(1);
+	float max = 3;
     while(1){
 			if(sample_done == 1){
 			for(int i = 0; i < N_SAMPLES; i++){
@@ -225,24 +237,29 @@ int main(){
 			for(uint16_t i = 1; i < 32; i++){
 					float val = magnitude(sample_vec[i])/2;
 					if(val < max ){
-						val = 0; 
+						val = 1; 
 					}
-					smoothing =c_smooth*old_column[i] + (1-c_smooth)* val;
-					old_column[i]  = column_vec[i];
-					column_vec[i] = smoothing;
+					if (val > old_column[i]){
+						old_column[i] = val; 
+						column_vec[i] = val; 
+					}else{
+						smoothing =c_smooth*old_column[i] + (1-c_smooth)* val;
+						old_column[i]  = column_vec[i];
+						column_vec[i] = smoothing;
+					}
 			}
-		//	column_vec[1] = column_vec[1]/2;
-		//	display_column[0] = (column_vec[1]+column_vec[2]+column_vec[3]+column_vec[4]+column_vec[5]+column_vec[6]+column_vec[7]+column_vec[8])/8.0;
-		//	display_column[1] = (column_vec[9]+column_vec[10]+column_vec[11]+column_vec[12]+column_vec[13]+column_vec[14])/6.0;
-		//	display_column[2] = (column_vec[15]+column_vec[16]+column_vec[17]+column_vec[18])/4.0;
-		//	display_column[3] = (column_vec[19] + column_vec[20])/2.0;
-		//	for(int i = 0; i < 12;i++){
-		//		display_column[i+4] = column_vec[21+i];
-		//	}
-			display_column[0] = column_vec[1]/2;
-			for(int i = 0; i < 15; i=i+2){
-				
+			display_column[0] = (column_vec[1]+column_vec[2] + column_vec[3] + column_vec[4] + column_vec[5])/10;
+			display_column[1] = (column_vec[6]+column_vec[7]+column_vec[8])/3;
+			display_column[2] = (column_vec[9]+column_vec[10]+column_vec[11])/3;
+			display_column[3] = (column_vec[12] + column_vec[13])/2; 
+			display_column[4] = (column_vec[14] + column_vec[15])/2; 
+			display_column[5] = (column_vec[16] + column_vec[17])/2; 
+			display_column[6] = (column_vec[18] + column_vec[19])/2; 
+			display_column[7] = (column_vec[20] + column_vec[21])/2; 
+			for(int i = 8; i < 18; i++){
+				display_column[i] = column_vec[14+i]; 
 			}
+			display_column[17] = 0xff;
 			columns(display_column);
 			sample_done = 0; 
 			timer2_start();	
